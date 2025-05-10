@@ -1,5 +1,16 @@
-在作者的基础上，增加了双目+IMU的配置支持，增加了YOLO11的支持
+修复了双目灰度图像的问题，完善了的配置支持，重写了YoloDetection文件，按照新版本Ultralyics的要求，增加YOLO11/v8/新版v5的支持
 
+基于此修改：https://github.com/HLkyss/modified_YOLO_ORB_SLAM3
+
+环境要求：
+**Pytorch 1.13.0**注意：由于需要兼容新版本YOLO，该文件与yolov5版本作者提供的不同，但安装方式相同，可以参考下方文档作者
+OpenCV 4.2.0
+
+yolov5版本作者下自带的yolo权重文件已不再支持，需要下载最新版本的yolo.pt权重文件，并且转为torchscript文件格式
+
+作为本科毕设开源
+
+------------------------------以下为yolov5版本README文件----------------------------------------------------------
 
 来源：https://github.com/YWL0720/YOLO_ORB_SLAM3<br />
 原开源代码只给了RGBD的，补充了一下自己使用的双目的，后面再补其他的<br />
