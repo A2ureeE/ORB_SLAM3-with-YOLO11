@@ -19,35 +19,35 @@
 /**
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2009, Willow Garage, Inc.
-*  All rights reserved.
+* Copyright (c) 2009, Willow Garage, Inc.
+* All rights reserved.
 *
-*  Redistribution and use in source and binary forms, with or without
-*  modification, are permitted provided that the following conditions
-*  are met:
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
 *
-*   * Redistributions of source code must retain the above copyright
-*     notice, this list of conditions and the following disclaimer.
-*   * Redistributions in binary form must reproduce the above
-*     copyright notice, this list of conditions and the following
-*     disclaimer in the documentation and/or other materials provided
-*     with the distribution.
-*   * Neither the name of the Willow Garage nor the names of its
-*     contributors may be used to endorse or promote products derived
-*     from this software without specific prior written permission.
+* * Redistributions of source code must retain the above copyright
+* notice, this list of conditions and the following disclaimer.
+* * Redistributions in binary form must reproduce the above
+* copyright notice, this list of conditions and the following
+* disclaimer in the documentation and/or other materials provided
+* with the distribution.
+* * Neither the name of the Willow Garage nor the names of its
+* contributors may be used to endorse or promote products derived
+* from this software without specific prior written permission.
 *
-*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-*  POSSIBILITY OF SUCH DAMAGE.
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+* FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+* COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+* BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+* CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+* LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+* ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+* POSSIBILITY OF SUCH DAMAGE.
 *
 */
 
@@ -58,6 +58,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
 #include <iostream>
+#include <algorithm> // 引入 std::max
 
 #include "ORBextractor.h"
 
@@ -556,6 +557,7 @@ namespace ORB_SLAM3
                                                          const int &maxX, const int &minY, const int &maxY, const int &N, const int &level)
     {
         // Compute how many initial nodes
+        // 计算初始节点数量
         const int nIni = round(static_cast<float>(maxX-minX)/(maxY-minY));
 
         const float hX = static_cast<float>(maxX-minX)/nIni;
@@ -579,6 +581,7 @@ namespace ORB_SLAM3
         }
 
         //Associate points to childs
+        // 将点关联到子节点
         for(size_t i=0;i<vToDistributeKeys.size();i++)
         {
             const cv::KeyPoint &kp = vToDistributeKeys[i];
@@ -624,16 +627,19 @@ namespace ORB_SLAM3
                 if(lit->bNoMore)
                 {
                     // If node only contains one point do not subdivide and continue
+                    // 如果节点只包含一个点，则不细分并继续
                     lit++;
                     continue;
                 }
                 else
                 {
                     // If more than one point, subdivide
+                    // 如果多于一个点，则细分
                     ExtractorNode n1,n2,n3,n4;
                     lit->DivideNode(n1,n2,n3,n4);
 
                     // Add childs if they contain points
+                    // 如果子节点包含点，则添加子节点
                     if(n1.vKeys.size()>0)
                     {
                         lNodes.push_front(n1);
@@ -682,6 +688,7 @@ namespace ORB_SLAM3
 
             // Finish if there are more nodes than required features
             // or all nodes contain just one point
+            // 如果节点数多于所需特征数，或者所有节点都只包含一个点，则结束
             if((int)lNodes.size()>=N || (int)lNodes.size()==prevSize)
             {
                 bFinish = true;
@@ -704,6 +711,7 @@ namespace ORB_SLAM3
                         vPrevSizeAndPointerToNode[j].second->DivideNode(n1,n2,n3,n4);
 
                         // Add childs if they contain points
+                        // 如果子节点包含点，则添加子节点
                         if(n1.vKeys.size()>0)
                         {
                             lNodes.push_front(n1);
@@ -755,8 +763,9 @@ namespace ORB_SLAM3
         }
 
         // Retain the best point in each node
+        // 在每个节点中保留最佳点
         vector<cv::KeyPoint> vResultKeys;
-        vResultKeys.reserve(nfeatures);
+        vResultKeys.reserve(nfeatures); // 使用成员变量 nfeatures
         for(list<ExtractorNode>::iterator lit=lNodes.begin(); lit!=lNodes.end(); lit++)
         {
             vector<cv::KeyPoint> &vNodeKeys = lit->vKeys;
@@ -778,30 +787,46 @@ namespace ORB_SLAM3
         return vResultKeys;
     }
 
+    // This method computes keypoints using an octree to distribute them evenly.
+    // 这种方法使用八叉树计算关键点，以使其均匀分布。
     void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint> >& allKeypoints)
     {
+        // Resize the vector to store keypoints for each level of the pyramid.
+        // 调整向量大小以存储金字塔每一层的关键点。
         allKeypoints.resize(nlevels);
 
-        const float W = 35;
+        const float W = 35; // Define the cell width for initial FAST detection. 定义初始FAST检测的单元格宽度。
 
+        // Iterate over each level of the image pyramid.
+        // 遍历图像金字塔的每一层。
         for (int level = 0; level < nlevels; ++level)
         {
+            // Define border margins to avoid detecting keypoints too close to the image edges.
+            // 定义边界边距，以避免检测到离图像边缘太近的关键点。
             const int minBorderX = EDGE_THRESHOLD-3;
             const int minBorderY = minBorderX;
             const int maxBorderX = mvImagePyramid[level].cols-EDGE_THRESHOLD+3;
             const int maxBorderY = mvImagePyramid[level].rows-EDGE_THRESHOLD+3;
 
+            // Vector to store keypoints detected in the current level before distribution.
+            // 用于存储在分布前当前层检测到的关键点的向量。
             vector<cv::KeyPoint> vToDistributeKeys;
-            vToDistributeKeys.reserve(nfeatures*10);
+            vToDistributeKeys.reserve(nfeatures*10); // Reserve space to avoid reallocations. 为避免重新分配而保留空间。
 
             const float width = (maxBorderX-minBorderX);
             const float height = (maxBorderY-minBorderY);
 
+            // Calculate the number of columns and rows for the grid.
+            // 计算网格的列数和行数。
             const int nCols = width/W;
             const int nRows = height/W;
+            // Calculate the width and height of each cell in the grid.
+            // 计算网格中每个单元格的宽度和高度。
             const int wCell = ceil(width/nCols);
             const int hCell = ceil(height/nRows);
 
+            // Iterate over each cell in the grid.
+            // 遍历网格中的每个单元格。
             for(int i=0; i<nRows; i++)
             {
                 const float iniY =minBorderY+i*hCell;
@@ -821,104 +846,95 @@ namespace ORB_SLAM3
                     if(maxX>maxBorderX)
                         maxX = maxBorderX;
 
-                    vector<cv::KeyPoint> vKeysCell;
+                    vector<cv::KeyPoint> vKeysCell; // Store keypoints for the current cell. 存储当前单元格的关键点。
 
+                    // Perform FAST detection with initial threshold.
+                    // 使用初始阈值执行FAST检测。
                     FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
                          vKeysCell,iniThFAST,true);
 
-                    /*if(bRight && j <= 13){
-                        FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                             vKeysCell,10,true);
-                    }
-                    else if(!bRight && j >= 16){
-                        FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                             vKeysCell,10,true);
-                    }
-                    else{
-                        FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                             vKeysCell,iniThFAST,true);
-                    }*/
-
-
+                    // If no keypoints found, try with a lower threshold.
+                    // 如果未找到关键点，则尝试使用较低的阈值。
                     if(vKeysCell.empty())
                     {
                         FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
                              vKeysCell,minThFAST,true);
-                        /*if(bRight && j <= 13){
-                            FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                                 vKeysCell,5,true);
-                        }
-                        else if(!bRight && j >= 16){
-                            FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                                 vKeysCell,5,true);
-                        }
-                        else{
-                            FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX),
-                                 vKeysCell,minThFAST,true);
-                        }*/
                     }
 
+                    // If keypoints are found in the cell, add them to vToDistributeKeys.
+                    // 如果在单元格中找到关键点，则将其添加到vToDistributeKeys。
                     if(!vKeysCell.empty())
                     {
                         for(vector<cv::KeyPoint>::iterator vit=vKeysCell.begin(); vit!=vKeysCell.end();vit++)
                         {
+                            // Adjust keypoint coordinates relative to the cell.
+                            // 调整关键点相对于单元格的坐标。
                             (*vit).pt.x+=j*wCell;
                             (*vit).pt.y+=i*hCell;
                             vToDistributeKeys.push_back(*vit);
                         }
                     }
+                } // End of cell columns iteration. 单元格列迭代结束。
+            } // End of cell rows iteration. 单元格行迭代结束。
 
-                    // Delete kp
-                    float scale = mvScaleFactor[level];
-                    for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++)
-                    {
-                        vit->pt.x += minBorderX;
-                        vit->pt.y += minBorderY;
-                        vit->pt *= scale;
-                    }
+            // --- BEGIN DYNAMIC FEATURE FILTERING ---
+            // --- 开始动态特征过滤 ---
+            if(!mvDynamicArea.empty() && !vToDistributeKeys.empty()) // Only filter if dynamic areas are present and there are keypoints. 仅当存在动态区域且有关键点时才进行过滤。
+            {
+                float scale = mvScaleFactor[level]; // Scale factor for the current pyramid level. 当前金字塔层级的缩放因子。
+                vector<cv::KeyPoint> vFilteredKeys; // Vector to store keypoints that are not in dynamic areas. 用于存储不在动态区域中的关键点的向量。
+                vFilteredKeys.reserve(vToDistributeKeys.size());
 
-                    bool Find = false;
-                    for (auto vit_kp = vToDistributeKeys.begin(); vit_kp != vToDistributeKeys.end();)
+                for (auto vit_kp = vToDistributeKeys.begin(); vit_kp != vToDistributeKeys.end(); ++vit_kp)
+                {
+                    // Create a temporary keypoint to scale its coordinates.
+                    // 创建一个临时关键点以缩放其坐标。
+                    cv::KeyPoint scaled_kp = *vit_kp;
+                    // Adjust coordinates by adding border offsets.
+                    // 通过添加边界偏移量来调整坐标。
+                    scaled_kp.pt.x += minBorderX;
+                    scaled_kp.pt.y += minBorderY;
+                    // Scale coordinates to the original image size.
+                    // 将坐标缩放到原始图像大小。
+                    scaled_kp.pt *= scale;
+
+                    bool bIsInDynamicArea = false;
+                    // Check if the scaled keypoint falls into any dynamic area.
+                    // 检查缩放后的关键点是否落入任何动态区域。
+                    for (const auto& dynamic_rect : mvDynamicArea)
                     {
-                        for (auto vit_area = mvDynamicArea.begin(); vit_area != mvDynamicArea.end(); vit_area++)
+                        if (dynamic_rect.contains(scaled_kp.pt))
                         {
-                            Find = false;
-                            if (vit_area->contains(vit_kp->pt))
-                            {
-                                Find = true;
-                                vit_kp = vToDistributeKeys.erase(vit_kp);
-                                break;
-                            }
-                        }
-
-                        if (!Find)
-                        {
-                            ++vit_kp;
-                            Find = false;
+                            bIsInDynamicArea = true;
+                            break; // If found in one dynamic area, no need to check others. 如果在一个动态区域中找到，则无需检查其他区域。
                         }
                     }
 
-                    float scale_inverse = 1 / scale;
-                    for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++)
+                    // If the keypoint is not in any dynamic area, keep it.
+                    // 如果关键点不在任何动态区域中，则保留它。
+                    if (!bIsInDynamicArea)
                     {
-                        vit->pt *= scale_inverse;
-                        vit->pt.x -= minBorderX;
-                        vit->pt.y -= minBorderY;
+                        vFilteredKeys.push_back(*vit_kp); // Keep the original keypoint (coordinates relative to the current pyramid level cell structure). 保留原始关键点（坐标相对于当前金字塔层级单元格结构）。
                     }
-
-
                 }
+                vToDistributeKeys = vFilteredKeys; // Replace the original list with the filtered one. 用过滤后的列表替换原始列表。
             }
+            // --- END DYNAMIC FEATURE FILTERING ---
+            // --- 动态特征过滤结束 ---
+
 
             vector<KeyPoint> & keypoints = allKeypoints[level];
-            keypoints.reserve(nfeatures);
+            keypoints.reserve(nfeatures); // Use member variable nfeatures. 使用成员变量nfeatures。
 
+            // Distribute keypoints evenly using an octree.
+            // 使用八叉树均匀分布关键点。
             keypoints = DistributeOctTree(vToDistributeKeys, minBorderX, maxBorderX,
                                           minBorderY, maxBorderY,mnFeaturesPerLevel[level], level);
 
             const int scaledPatchSize = PATCH_SIZE*mvScaleFactor[level];
 
-            // Add border to coordinates and scale information
+            // Add border to coordinates and scale information.
+            // 为坐标和缩放信息添加边框。
             const int nkps = keypoints.size();
             for(int i=0; i<nkps ; i++)
             {
@@ -927,12 +943,14 @@ namespace ORB_SLAM3
                 keypoints[i].octave=level;
                 keypoints[i].size = scaledPatchSize;
             }
-        }
+        } // End of pyramid levels iteration. 金字塔层级迭代结束。
 
-        // compute orientations
+        // compute orientations for all keypoints.
+        // 计算所有关键点的方向。
         for (int level = 0; level < nlevels; ++level)
             computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
     }
+
 
     void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint> > &allKeypoints)
     {
@@ -1045,7 +1063,7 @@ namespace ORB_SLAM3
 
 
             // Retain by score
-
+            // 按分数保留
             while(nToDistribute>0 && nNoMore<nCells)
             {
                 int nNewFeaturesCell = nfeaturesCell + ceil((float)nToDistribute/(nCells-nNoMore));
@@ -1080,6 +1098,7 @@ namespace ORB_SLAM3
             const int scaledPatchSize = PATCH_SIZE*mvScaleFactor[level];
 
             // Retain by score and transform coordinates
+            // 按分数保留并转换坐标
             for(int i=0; i<levelRows; i++)
             {
                 for(int j=0; j<levelCols; j++)
@@ -1109,6 +1128,7 @@ namespace ORB_SLAM3
         }
 
         // and compute orientations
+        // 并计算方向
         for (int level = 0; level < nlevels; ++level)
             computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
     }
@@ -1122,28 +1142,76 @@ namespace ORB_SLAM3
             computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
     }
 
+    // Main operator function to extract ORB features.
+    // 提取ORB特征的主操作函数。
     int ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
                                   OutputArray _descriptors, std::vector<int> &vLappingArea)
     {
-        //cout << "[ORBextractor]: Max Features: " << nfeatures << endl;
         if(_image.empty())
             return -1;
 
         Mat image = _image.getMat();
         assert(image.type() == CV_8UC1 );
 
-        // Pre-compute the scale pyramid
+        // Pre-compute the scale pyramid.
+        // 预计算尺度金字塔。
         ComputePyramid(image);
 
-        vector < vector<KeyPoint> > allKeypoints;
+        vector < vector<KeyPoint> > allKeypoints; // To store keypoints from all levels. 用于存储所有层级的关键点。
+
+        // --- BEGIN MODIFICATION FOR TWO-PASS EXTRACTION ---
+        // --- 开始进行两遍提取的修改 ---
+        // First pass: Extract keypoints with current FAST thresholds.
+        // 第一遍：使用当前的FAST阈值提取关键点。
         ComputeKeyPointsOctTree(allKeypoints);
-        //ComputeKeyPointsOld(allKeypoints);
+
+        int nkeypoints_pass1 = 0;
+        for (int level = 0; level < nlevels; ++level)
+            nkeypoints_pass1 += (int)allKeypoints[level].size();
+
+        // If the number of keypoints from the first pass is less than desired,
+        // try a second pass with looser FAST thresholds.
+        // 如果第一遍提取的关键点数量少于期望值，则尝试使用更宽松的FAST阈值进行第二遍提取。
+        if (nkeypoints_pass1 < nfeatures)
+        {
+        	
+            std::cout << "[ORBextractor]: Pass 1 found " << nkeypoints_pass1 << " keypoints. Target: " << nfeatures << ". Trying pass 2." << std::endl;
+            // Store original FAST thresholds.
+            // 存储原始FAST阈值。
+            int original_iniThFAST = iniThFAST;
+            int original_minThFAST = minThFAST;
+
+            // Set looser FAST thresholds for the second pass.
+            // 为第二遍设置更宽松的FAST阈值。
+            iniThFAST = original_minThFAST; // Use the previous minimum as the new initial. 使用之前的最小值作为新的初始值。
+            minThFAST = std::max(1, original_minThFAST / 2); // Further reduce the minimum, ensuring it's at least 1. 进一步降低最小值，确保至少为1。
+
+            // Recompute keypoints with looser thresholds. Dynamic filtering is still applied.
+            // 使用更宽松的阈值重新计算关键点。动态过滤仍会应用。
+            // ComputeKeyPointsOctTree resizes and fills allKeypoints internally.
+            // ComputeKeyPointsOctTree会在内部调整大小并填充allKeypoints。
+            ComputeKeyPointsOctTree(allKeypoints);
+
+            // Restore original FAST thresholds for subsequent calls.
+            // 为后续调用恢复原始FAST阈值。
+            iniThFAST = original_iniThFAST;
+            minThFAST = original_minThFAST;
+
+            // int nkeypoints_pass2 = 0;
+            // for (int level = 0; level < nlevels; ++level)
+            //     nkeypoints_pass2 += (int)allKeypoints[level].size();
+            // std::cout << "[ORBextractor]: Pass 2 found " << nkeypoints_pass2 << " keypoints." << std::endl;
+        }
+        // --- END MODIFICATION FOR TWO-PASS EXTRACTION ---
+        // --- 两遍提取的修改结束 ---
+
 
         Mat descriptors;
 
         int nkeypoints = 0;
         for (int level = 0; level < nlevels; ++level)
             nkeypoints += (int)allKeypoints[level].size();
+
         if( nkeypoints == 0 )
             _descriptors.release();
         else
@@ -1152,13 +1220,21 @@ namespace ORB_SLAM3
             descriptors = _descriptors.getMat();
         }
 
-        //_keypoints.clear();
-        //_keypoints.reserve(nkeypoints);
-        _keypoints = vector<cv::KeyPoint>(nkeypoints);
+        _keypoints.assign(nkeypoints, KeyPoint()); // Assign with default-constructed KeyPoint objects. 使用默认构造的KeyPoint对象进行分配。
 
         int offset = 0;
         //Modified for speeding up stereo fisheye matching
-        int monoIndex = 0, stereoIndex = nkeypoints-1;
+        // 为加速立体鱼眼匹配而修改
+        int monoIndex = 0;
+        int stereoIndex = nkeypoints-1; // Initialize stereoIndex correctly. 正确初始化stereoIndex。
+
+        // Check if nkeypoints is zero to prevent invalid access to stereoIndex.
+        // 检查nkeypoints是否为零，以防止对stereoIndex的无效访问。
+        if (nkeypoints == 0 && stereoIndex < 0) { // This condition might be too strict, nkeypoints == 0 is enough. 这个条件可能过于严格，nkeypoints == 0就足够了。
+             stereoIndex = -1; // Or handle as an error/empty case. 或者作为错误/空情况处理。
+        }
+
+
         for (int level = 0; level < nlevels; ++level)
         {
             vector<KeyPoint>& keypoints = allKeypoints[level];
@@ -1168,42 +1244,49 @@ namespace ORB_SLAM3
                 continue;
 
             // preprocess the resized image
+            // 预处理调整大小后的图像
             Mat workingMat = mvImagePyramid[level].clone();
             GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
 
             // Compute the descriptors
-            //Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
+            // 计算描述子
             Mat desc = cv::Mat(nkeypointsLevel, 32, CV_8U);
             computeDescriptors(workingMat, keypoints, desc, pattern);
 
-            offset += nkeypointsLevel;
+            // offset += nkeypointsLevel; // Offset is not used in the modified logic below. 在下面的修改逻辑中未使用Offset。
 
-
-            float scale = mvScaleFactor[level]; //getScale(level, firstLevel, scaleFactor);
-            int i = 0;
+            float scale = mvScaleFactor[level];
+            int i = 0; // Index for iterating through `desc` and `keypoints` of the current level. 用于迭代当前层级的`desc`和`keypoints`的索引。
             for (vector<KeyPoint>::iterator keypoint = keypoints.begin(),
                          keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint){
 
                 // Scale keypoint coordinates
+                // 缩放关键点坐标
                 if (level != 0){
                     keypoint->pt *= scale;
                 }
 
+                // Sort keypoints based on lapping area for stereo fisheye.
+                // 根据立体鱼眼的重叠区域对关键点进行排序。
                 if(keypoint->pt.x >= vLappingArea[0] && keypoint->pt.x <= vLappingArea[1]){
-                    _keypoints.at(stereoIndex) = (*keypoint);
-                    desc.row(i).copyTo(descriptors.row(stereoIndex));
-                    stereoIndex--;
+                     if (stereoIndex >= 0 && stereoIndex < nkeypoints) { // Bounds check for stereoIndex. 对stereoIndex进行边界检查。
+                        _keypoints.at(stereoIndex) = (*keypoint);
+                        desc.row(i).copyTo(descriptors.row(stereoIndex));
+                        stereoIndex--;
+                    }
                 }
                 else{
-                    _keypoints.at(monoIndex) = (*keypoint);
-                    desc.row(i).copyTo(descriptors.row(monoIndex));
-                    monoIndex++;
+                    if (monoIndex >= 0 && monoIndex < nkeypoints) { // Bounds check for monoIndex. 对monoIndex进行边界检查。
+                        _keypoints.at(monoIndex) = (*keypoint);
+                        desc.row(i).copyTo(descriptors.row(monoIndex));
+                        monoIndex++;
+                    }
                 }
                 i++;
             }
         }
         //cout << "[ORBextractor]: extracted " << _keypoints.size() << " KeyPoints" << endl;
-        return monoIndex;
+        return monoIndex; // Return the number of monocular keypoints. 返回单目关键点的数量。
     }
 
     void ORBextractor::ComputePyramid(cv::Mat image)
@@ -1217,6 +1300,7 @@ namespace ORB_SLAM3
             mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
 
             // Compute the resized image
+            // 计算调整大小后的图像
             if( level != 0 )
             {
                 resize(mvImagePyramid[level-1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);

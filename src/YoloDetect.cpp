@@ -7,7 +7,7 @@ YoloDetection::YoloDetection()//
 {
     torch::jit::setTensorExprFuserEnabled(false);//关闭tensor表达式融合器
     //torch::jit::script::Module mModule;
-    mModule = torch::jit::load("/home/zhang/modified_YOLOORB_SLAM3_improved/yolo/yolo11s.torchscript");       //模型加载
+    mModule = torch::jit::load("/home/zhang/modified_YOLOORB_SLAM3_improved/yolo/yolo11n.torchscript");       //模型加载
     mModule.eval();//模型设置为评估模式
     mModule.to(torch::kFloat);//模型转换为float32
     std::ifstream f("coco.names");//加载类别名称
@@ -29,7 +29,7 @@ bool YoloDetection::Detect()//检测器
 {
     torch::Device device(torch::kCPU);
     cv::Mat img;
-    std::cout<<"load img ready"<<endl;
+   
 
     if(mRGB.empty())
     {
@@ -41,26 +41,26 @@ bool YoloDetection::Detect()//检测器
     {
         cv::cvtColor(mRGB, mRGB, cv::COLOR_GRAY2RGB);
     }
-//输出图像通道数
-    std::cout<<"图像通道数为："<<mRGB.channels()<<std::endl;
+
+
     cv::resize(mRGB, img, cv::Size(640, 640));
     cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
     // letterbox(mRGB, img, {640, 640}); // 调整图像大小并添加填充
     torch::Tensor imgTensor = torch::from_blob(img.data, {img.rows, img.cols,3},torch::kByte).clone();//图像数据转换为张量
-    cout<<"success from_blob"<<endl;
+
     //imgTensor = imgTensor.toType(torch::kFloat).div(255); // 将张量归一化到[0,1]范围
     torch::Tensor keep= imgTensor.toType(torch::kFloat); // 转换张量数据类型为浮点型
     keep = keep.permute({2,0,1});
     keep = keep.unsqueeze(0); 
-    cout<<"success toType"<<endl;
+
     keep = keep.div(255); 
-    std::cout<<"success div255"<<std::endl;
+
     
     
     
-    std::cout<<"success"<<std::endl;
+
     std::vector<torch::jit::IValue> inputs {keep}; // 创建输入向量
-    std::cout<<"success"<<std::endl;
+
 
 
     // // Preparing input tensor
@@ -83,14 +83,12 @@ bool YoloDetection::Detect()//检测器
     torch::Tensor preds;
     preds = mModule.forward(inputs).toTensor().cpu();//模型前向推理
 //NMS
-    std::cout << "Tensor shape: " << preds.sizes() << std::endl;
-    std::cout << "Original tensor device: " << imgTensor.device() << std::endl;
     auto dets = non_max_suppression(preds)[0];
-    std::cout << "success" << dets.sizes() << std::endl;
+
     auto boxes = dets.index({Slice(), Slice(None, 4)});//获取边界框
-    std::cout << "success" << boxes.sizes() << std::endl;
+
     //输出boxes内容
-    std::cout << "Boxes: " << boxes << std::endl;
+
     //dets.index_put_({Slice(), Slice(None, 4)}, scale_boxes({img.rows, img.cols}, boxes, {mRGB.rows, mRGB.cols}));
     if (dets.size(0)>0)
     {
