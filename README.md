@@ -1,5 +1,7 @@
 修复了双目灰度图像的问题，完善了的配置支持，重写了YoloDetection文件，按照新版本Ultralyics的要求，增加YOLO11/v8/新版v5的支持
 
+为ORB提取算法补充了二次提取的代码，当动态剔除后如果特征点过少，会触发这一机制，从而使得特征点满足yaml文件要求
+
 基于此修改：https://github.com/HLkyss/modified_YOLO_ORB_SLAM3
 
 环境要求：
